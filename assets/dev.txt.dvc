@@ -1,0 +1,5 @@
+outs:
+- md5: d9492db1858f07a26cbb1f3b3f98a49f
+  size: 827443
+  hash: md5
+  path: dev.txt
