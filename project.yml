@@ -8,9 +8,10 @@ vars:
   train: "train.txt"
   dev: "dev.txt"
   test: "test.txt"
+  version: "0.0.1"
   # Set your GPU ID, -1 is CPU
-  gpu_id: -1
-  model: "en_core_web_md"
+  gpu_id: 0
+  vectors_model: "en_core_web_md"
 
 # These are the directories that the project needs. The project CLI will make
 # sure that they always exist.
@@ -26,29 +27,34 @@ assets:
   - dest: "assets/test.txt"
     description: "Conll test data"  
 
-# Workflows are sequences of commands (see below) executed in order. You can
-# run them via "spacy project run [workflow]". If a commands's inputs/outputs
-# haven't changed, it won't be re-run.
+# Workflows are sequences of commands (see below) executed in order. 
+# The following can be run with `weasel run all`. 
 workflows:
   all:
+    - download-data
+    - download-model
     - convert
-    - create-config
     - train
     - evaluate
 
-# Project commands
+# Single commands that can be run with `weasel run <command>`.
 commands:
-  - name: "download"
+  - name: "download-data"
+    help: "Pull the data from the remote storage"
+    script:
+      - "dvc pull"
+
+  - name: "download-model"
     help: "Download a spaCy model with pretrained vectors"
     script:
-      - "python -m spacy download ${vars.model}"
+      - "python -m spacy download ${vars.vectors_model}"
 
   - name: "convert"
     help: "Convert the data to spaCy's binary format"
     script:
-      - "python -m spacy convert assets/${vars.train} corpus/ --converter conll -n 10"
-      - "python -m spacy convert assets/${vars.dev} corpus/ --converter conll -n 10"
-      - "python -m spacy convert assets/${vars.test} corpus/ --converter conll -n 10"
+      - "python -m spacy convert assets/${vars.train} corpus/ --converter conll -n 3"
+      - "python -m spacy convert assets/${vars.dev} corpus/ --converter conll -n 3"
+      - "python -m spacy convert assets/${vars.test} corpus/ --converter conll -n 3"
     deps:
       - "assets/${vars.train}"
       - "assets/${vars.dev}"
@@ -58,17 +64,10 @@ commands:
       - "corpus/dev.spacy"
       - "corpus/test.spacy"
 
-  - name: "create-config"
-    help: "Create a config file for a NER pipeline"
-    script:
-      - "python -m spacy init config --lang ${vars.lang} --pipeline ner configs/config.cfg --force"
-    outputs:
-      - "configs/config.cfg"
-
   - name: "train"
     help: "Train the NER model"
     script:
-      - "python -m spacy train configs/config.cfg --output training/ --paths.train corpus/train.spacy --paths.dev corpus/dev.spacy --training.eval_frequency 10 --training.patience 50 --gpu-id ${vars.gpu_id}"
+      - "python -m spacy train configs/config.cfg --output training/ --paths.train corpus/train.spacy --paths.dev corpus/dev.spacy --training.eval_frequency 10 --training.patience 50 --gpu-id ${vars.gpu_id} --initialize.vectors ${vars.vectors_model} --components.tok2vec.model.embed.include_static_vectors true"
     deps:
       - "configs/config.cfg"
       - "corpus/train.spacy"
@@ -93,3 +92,12 @@ commands:
     deps:
       - "scripts/visualize_model.py"
       - "training/model-best"
+
+  - name: package
+    help: "Package the trained model as a pip package"
+    script:
+      - "python -m spacy package training/model-best packages --name ${vars.name} --version ${vars.version} --force"
+    deps:
+      - "training/model-best"
+    outputs_no_cache:
+      - "packages/${vars.lang}_${vars.name}-${vars.version}/dist/${vars.lang}_${vars.name}-${vars.version}.tar.gz"

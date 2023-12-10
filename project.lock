@@ -7,9 +7,9 @@ download:
 convert:
   cmd: python -m weasel run convert
   script:
-    - python -m spacy convert assets/train.txt corpus/ --converter conll -n 10
-    - python -m spacy convert assets/dev.txt corpus/ --converter conll -n 10
-    - python -m spacy convert assets/test.txt corpus/ --converter conll -n 10
+    - python -m spacy convert assets/train.txt corpus/ --converter conll -n 3
+    - python -m spacy convert assets/dev.txt corpus/ --converter conll -n 3
+    - python -m spacy convert assets/test.txt corpus/ --converter conll -n 3
   deps:
     - path: assets/train.txt
       md5: a595d83962c932f2b59fb52227a16086
@@ -19,11 +19,11 @@ convert:
       md5: 9cdd4db35b65db782ea91c80f62d074e
   outs:
     - path: corpus/train.spacy
-      md5: 614e07648e7aacf31d7c4680836cdffc
+      md5: 9580f06ef093295c9faed4c4ad197502
     - path: corpus/dev.spacy
-      md5: e989a5582870c0d96013cb9660cb347c
+      md5: dd34c80d16e78da82d2a7ed3f92c8270
     - path: corpus/test.spacy
-      md5: 468f94ca41307ff1772041c4fd75ded9
+      md5: bb206282199c0524c1ad7b5e7025fa5c
 create-config:
   cmd: python -m weasel run create-config
   script:
@@ -37,29 +37,30 @@ train:
   script:
     - python -m spacy train configs/config.cfg --output training/ --paths.train corpus/train.spacy
       --paths.dev corpus/dev.spacy --training.eval_frequency 10 --training.patience
-      50 --gpu-id -1
+      50 --gpu-id 0 --initialize.vectors en_core_web_md --components.tok2vec.model.embed.include_static_vectors
+      true
   deps:
     - path: configs/config.cfg
       md5: edc129c73686d45c362a1fe4fc6cbc36
     - path: corpus/train.spacy
-      md5: 614e07648e7aacf31d7c4680836cdffc
+      md5: 9580f06ef093295c9faed4c4ad197502
     - path: corpus/dev.spacy
-      md5: e989a5582870c0d96013cb9660cb347c
+      md5: dd34c80d16e78da82d2a7ed3f92c8270
   outs:
     - path: training/model-best
-      md5: 8436307be11ef1d5b3778cb829b4f0f7
+      md5: 55cefa79670e81190a069c49e337683c
 evaluate:
   cmd: python -m weasel run evaluate
   script:
     - python -m spacy evaluate training/model-best corpus/dev.spacy --output training/metrics.json
   deps:
     - path: corpus/dev.spacy
-      md5: e989a5582870c0d96013cb9660cb347c
+      md5: dd34c80d16e78da82d2a7ed3f92c8270
     - path: training/model-best
-      md5: 8436307be11ef1d5b3778cb829b4f0f7
+      md5: 55cefa79670e81190a069c49e337683c
   outs:
     - path: training/metrics.json
-      md5: 7e90d70471b72d3aa8f65a5126a46a3e
+      md5: 504ca89d30d2a6cf7c6fd25998fde04c
 package:
   cmd: python -m weasel run package
   script:
@@ -71,3 +72,15 @@ package:
   outs:
     - path: packages/en_ner_demo-0.0.0/dist/en_ner_demo-0.0.0.tar.gz
       md5: cb6051845307d579f57bef88dbea48d8
+download-data:
+  cmd: python -m weasel run download-data
+  script:
+    - dvc pull
+  deps: []
+  outs: []
+download-model:
+  cmd: python -m weasel run download-model
+  script:
+    - python -m spacy download en_core_web_md
+  deps: []
+  outs: []
